@@ -99,7 +99,23 @@ i{ margin-right:6px; }
   color:#fff; font-weight:800; font-size:1rem;
 }
 .name-text{ font-weight:700; font-size:.92rem; letter-spacing:3px; }
-.hub-footer{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:50px; }
+.hub-footer{ display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap; margin-top:50px; }
+.teacher-access{ display:flex; flex-direction:column; align-items:center; gap:10px; }
+.teacher-badge{ display:inline-block; border:1.5px solid var(--line); border-radius:999px; padding:5px 18px; font-size:.7rem; font-weight:800; letter-spacing:3px; color:var(--muted); background:#fff; }
+.teacher-lock-btn{ width:52px; height:52px; border-radius:50%; background:var(--ink); color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:1.15rem; cursor:pointer; transition:.15s; }
+.teacher-lock-btn i{ margin:0; }
+.teacher-lock-btn:hover{ background:#333; transform:scale(1.06); }
+
+.modal-overlay{ position:fixed; inset:0; background:rgba(17,17,17,.55); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px; }
+.modal-box{ background:#fff; border-radius:20px; padding:32px 24px; max-width:300px; width:100%; text-align:center; animation:fadeIn .2s ease; }
+.modal-lock-icon{ width:52px; height:52px; border-radius:50%; background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.15rem; margin:0 auto 14px; }
+.modal-lock-icon i{ margin:0; }
+.modal-box h3{ margin:0 0 4px; font-size:1.05rem; font-weight:900; }
+.modal-box p{ color:var(--muted); font-size:.82rem; margin:0 0 16px; }
+.modal-box input{ width:100%; border:1.5px solid var(--line); border-radius:10px; padding:12px; font-size:1.3rem; text-align:center; letter-spacing:8px; margin-bottom:6px; font-family:inherit; }
+.modal-error{ color:#e11d48; font-size:.78rem; font-weight:700; margin-bottom:10px; }
+.modal-actions{ display:flex; gap:8px; margin-top:14px; }
+.modal-actions .btn{ flex:1; }
 
 /* ===== portfolio content ===== */
 .portfolio-page{ animation:fadeIn .25s ease; }
@@ -280,25 +296,37 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window.storage = {
   async get(key, shared){
     const { data, error } = await sb.from(KV_TABLE).select('value').eq('key', key).maybeSingle();
-    if(error) throw error;
+    if(error){
+      console.error('storage.get 실패 (' + key + '): ' + (error.message||'') + ' / code=' + (error.code||'') + ' / details=' + (error.details||''));
+      throw error;
+    }
     if(!data) throw new Error('not found: ' + key);
     return { key, value: JSON.stringify(data.value), shared: !!shared };
   },
   async set(key, value, shared){
     const { error } = await sb.from(KV_TABLE).upsert({ key, value: JSON.parse(value), updated_at: new Date().toISOString() }, { onConflict: 'key' });
-    if(error){ console.error(error); return null; }
+    if(error){
+      console.error('storage.set 실패 (' + key + '): ' + (error.message||'') + ' / code=' + (error.code||'') + ' / details=' + (error.details||''));
+      return null;
+    }
     return { key, value, shared: !!shared };
   },
   async delete(key, shared){
     const { error } = await sb.from(KV_TABLE).delete().eq('key', key);
-    if(error){ console.error(error); return null; }
+    if(error){
+      console.error('storage.delete 실패 (' + key + '): ' + (error.message||'') + ' / code=' + (error.code||'') + ' / details=' + (error.details||''));
+      return null;
+    }
     return { key, deleted:true, shared: !!shared };
   },
   async list(prefix, shared){
     let q = sb.from(KV_TABLE).select('key');
     if(prefix) q = q.like('key', prefix + '%');
     const { data, error } = await q;
-    if(error) throw error;
+    if(error){
+      console.error('storage.list 실패: ' + (error.message||'') + ' / code=' + (error.code||'') + ' / details=' + (error.details||''));
+      throw error;
+    }
     return { keys:(data||[]).map(d=>d.key), prefix, shared: !!shared };
   }
 };
@@ -469,8 +497,10 @@ function renderHome(){
       </div>
       <div class="name-grid">${cards}</div>
       <div class="hub-footer">
-        <button class="btn ghost" onclick="openAdmin()"><i class="fa-solid fa-chart-column"></i>관리자 모드</button>
-        <button class="btn ghost" onclick="openEditNames()"><i class="fa-solid fa-gear"></i>명단 수정</button>
+        <div class="teacher-access">
+          <span class="teacher-badge">TEACHER</span>
+          <button class="teacher-lock-btn" onclick="showAdminPwModal()" title="관리자 모드"><i class="fa-solid fa-lock"></i></button>
+        </div>
       </div>
     </div>
   `;
@@ -1057,13 +1087,46 @@ async function downloadCurrentPDF(){
 }
 
 /* ===================== ADMIN ===================== */
-async function openAdmin(){
-  const pw = prompt('관리자 비밀번호를 입력하세요.');
-  if(pw === null) return;
+function showAdminPwModal(){
+  closeAdminPwModal();
+  const overlay = document.createElement('div');
+  overlay.id = 'admin-pw-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-lock-icon"><i class="fa-solid fa-lock"></i></div>
+      <h3>관리자 인증</h3>
+      <p>비밀번호를 입력하세요</p>
+      <div class="modal-error" id="pw-error" style="display:none;"></div>
+      <input type="password" id="pw-input" inputmode="numeric" placeholder="••••">
+      <div class="modal-actions">
+        <button class="btn ghost" id="pw-cancel">취소</button>
+        <button class="btn primary" id="pw-confirm">확인</button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeAdminPwModal(); });
+  document.body.appendChild(overlay);
+  const input = overlay.querySelector('#pw-input');
+  input.focus();
+  input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') confirmAdminPw(); });
+  overlay.querySelector('#pw-cancel').addEventListener('click', closeAdminPwModal);
+  overlay.querySelector('#pw-confirm').addEventListener('click', confirmAdminPw);
+}
+function closeAdminPwModal(){
+  const el = document.getElementById('admin-pw-overlay');
+  if(el) el.remove();
+}
+async function confirmAdminPw(){
+  const input = document.getElementById('pw-input');
+  const pw = input ? input.value : '';
   if(pw.trim() !== '0530'){
-    alert('비밀번호가 일치하지 않습니다.');
+    const err = document.getElementById('pw-error');
+    if(err){ err.textContent='비밀번호가 일치하지 않습니다.'; err.style.display='block'; }
+    if(input){ input.value=''; input.focus(); }
     return;
   }
+  closeAdminPwModal();
   view='admin-loading'; render();
   adminData = [];
   for(let i=0;i<config.names.length;i++){
@@ -1110,6 +1173,8 @@ function renderAdmin(){
       <div class="action-bar">
         <button class="btn primary" onclick="downloadAllPDF()"><i class="fa-solid fa-download"></i>전체 포트폴리오 PDF 한번에 다운로드</button>
         <button class="btn secondary" onclick="openContactList()"><i class="fa-solid fa-address-book"></i>연락처 목록 보기</button>
+        <button class="btn secondary" onclick="openEditNames()"><i class="fa-solid fa-gear"></i>명단 수정</button>
+        <button class="btn secondary" onclick="toggleRightClickLock()"><i class="fa-solid ${config.rightClickLocked?'fa-lock':'fa-lock-open'}"></i>${config.rightClickLocked?'마우스 오른쪽 풀기':'마우스 오른쪽 잠그기'}</button>
       </div>
       <table class="admin-table">
         <thead><tr><th>이름</th><th>이모티콘</th><th>스톡이미지</th><th>애니메이션</th><th>상태</th><th>관리</th></tr></thead>
@@ -1170,6 +1235,23 @@ async function resetStudentData(i){
   }
 }
 
+async function toggleRightClickLock(){
+  const next = !config.rightClickLocked;
+  try{
+    const newConfig = Object.assign({}, config, { rightClickLocked: next });
+    const result = await window.storage.set('config', JSON.stringify(newConfig), true);
+    if(result){
+      config.rightClickLocked = next;
+      showToast(next ? '학생 화면에서 마우스 우클릭이 잠겼습니다.' : '학생 화면에서 마우스 우클릭이 허용됩니다.');
+      render();
+    }else{
+      alert('설정 저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
+  }catch(e){
+    alert('설정 저장 중 오류가 발생했습니다.\n(상세: ' + ((e&&e.message)?e.message:String(e)) + ')');
+  }
+}
+
 function viewAsAdmin(i){
   currentIdx=i;
   viewData = adminData[i];
@@ -1201,16 +1283,35 @@ async function init(){
     const res = await window.storage.get('config', true);
     config = JSON.parse(res.value);
     if(!config.names || !Array.isArray(config.names) || config.names.length < 2) throw new Error('invalid');
+    if(typeof config.rightClickLocked !== 'boolean') config.rightClickLocked = true;
     view='home';
   }catch(e){
     const names = [];
     for(let i=1;i<=20;i++){ names.push('학생'+i); }
-    config = {names:names};
+    config = {names:names, rightClickLocked:true};
     try{ await window.storage.set('config', JSON.stringify(config), true); }catch(err){}
     view='home';
   }
   render();
 }
+
+function isAdminView(){
+  return view==='admin' || view==='admin-loading' || view==='admin-contacts' || view==='student-view-admin' || view==='setup' || view==='setup-edit';
+}
+
+document.addEventListener('contextmenu', function(e){
+  if(isAdminView()) return;
+  if(config && config.rightClickLocked){ e.preventDefault(); }
+});
+document.addEventListener('keydown', function(e){
+  if(isAdminView()) return;
+  if(!config || !config.rightClickLocked) return;
+  const k = (e.key||'').toUpperCase();
+  if(k==='F12' || (e.ctrlKey && k==='U') || (e.ctrlKey && e.shiftKey && (k==='I'||k==='J'||k==='C'))){
+    e.preventDefault();
+  }
+});
+
 init();
 </script>
 </body>
