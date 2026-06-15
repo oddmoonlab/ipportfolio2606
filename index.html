@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>캐릭터 IP 포트폴리오</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --ink:#111111;
+  --muted:#9a9a9a;
+  --line:#e6e6e6;
+  --bg:#ffffff;
+  --p1:#dbeafe;
+  --p2:#fde7d4;
+  --p3:#fbe1e8;
+  --p4:#e3f2e7;
+  --p5:#ece4f7;
+  --p6:#fff4d6;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',-apple-system,Helvetica,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  padding-bottom:40px;
+}
+.topbar-wrap{ display:flex; justify-content:center; padding:72px 20px 14px; }
+.topbar{
+  background:var(--ink); color:#fff; padding:13px 40px; border-radius:999px;
+  font-weight:800; font-size:.95rem; letter-spacing:4px; cursor:pointer;
+  transition:opacity .15s;
+}
+.topbar:hover{ opacity:.85; }
+.container{ max-width:1200px; margin:0 auto; padding:20px; }
+
+/* ===== buttons ===== */
+.btn{
+  border:1.5px solid var(--ink); border-radius:999px; padding:10px 20px; font-size:.9rem; font-weight:700;
+  cursor:pointer; transition:.15s; font-family:inherit; background:#fff; color:var(--ink);
+}
+.btn:hover{ background:var(--ink); color:#fff; }
+.btn.primary{ background:var(--ink); color:#fff; }
+.btn.primary:hover{ background:#333; }
+.btn.secondary{ background:#fff; color:var(--ink); border:1.5px solid var(--ink); }
+.btn.ghost{ border:1.5px solid var(--line); color:var(--muted); }
+.btn.ghost:hover{ background:#fafafa; color:var(--ink); border-color:var(--ink); }
+.btn.small{ padding:6px 14px; font-size:.78rem; }
+.btn.danger{ border-color:#e11d48; color:#e11d48; }
+.btn.danger:hover{ background:#e11d48; color:#fff; }
+.btn.add{ border:1.5px dashed var(--line); background:#fafafa; color:var(--muted); width:100%; margin-top:8px; padding:10px; border-radius:10px; }
+.btn.add:hover{ background:#f3f3f3; color:var(--ink); border-color:var(--ink); }
+.back{ margin-bottom:32px; }
+i{ margin-right:6px; }
+.item-link i, .item-link-text i{ margin-right:4px; }
+
+/* ===== loading / setup / error ===== */
+.loading{ text-align:center; padding:60px 20px; font-size:1.05rem; color:var(--muted); }
+.error-box{
+  margin:20px; padding:20px; border:2px solid #e11d48; border-radius:12px; background:#fef2f2;
+  color:#b91c1c; font-size:.85rem;
+}
+.error-box pre{ white-space:pre-wrap; word-break:break-all; margin:8px 0 0; }
+.card{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:28px; }
+.setup-card h2{ margin-top:0; font-weight:900; letter-spacing:1px; }
+.setup-card textarea{
+  width:100%; border:1.5px solid var(--line); border-radius:10px; padding:12px; font-size:1rem;
+  font-family:inherit; resize:vertical; margin:12px 0;
+}
+.setup-card .row{ display:flex; gap:10px; }
+
+/* ===== hub / home ===== */
+.hub-header{ text-align:center; margin-bottom:32px; padding-top:6px; }
+.hub-header h1{
+  font-weight:800; font-size:2rem; letter-spacing:.5px; line-height:1.4; margin:0 auto 6px;
+  max-width:640px;
+}
+.title-underline{ display:inline-block; border-bottom:3px solid var(--ink); padding-bottom:6px; }
+.hub-header .instructor{ font-weight:700; font-size:1.1rem; letter-spacing:1px; color:#666; margin:0 0 48px; }
+.hub-header p{ color:var(--muted); margin:0; font-size:.9rem; letter-spacing:.5px; }
+.name-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px; margin-bottom:28px;
+}
+.name-card{
+  background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:20px 10px; text-align:center; cursor:pointer;
+  transition:.15s;
+}
+.name-card:hover{ background:#f0f0f0; border-color:var(--ink); transform:translateY(-2px); }
+.name-card:active{ background:#e2e2e2; transform:translateY(0); }
+.name-avatar{ position:relative; margin:0 auto 10px; display:flex; align-items:center; justify-content:center; }
+.name-avatar i{ font-size:2.6rem; color:var(--ink); margin-right:0; }
+.name-avatar span{
+  position:absolute; top:44%; left:50%; transform:translate(-50%,-50%);
+  color:#fff; font-weight:800; font-size:1rem;
+}
+.name-text{ font-weight:700; font-size:.92rem; letter-spacing:3px; }
+.hub-footer{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:50px; }
+
+/* ===== portfolio content ===== */
+.portfolio-page{ animation:fadeIn .25s ease; }
+@keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+.profile-header{
+  display:flex; flex-direction:column; align-items:center; text-align:center; border-bottom:4px solid var(--ink); padding-bottom:24px; margin-bottom:32px;
+}
+.profile-header h2{ margin:0 0 10px; font-size:2.6rem; font-weight:900; letter-spacing:2px; }
+.contact-info{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 26px; margin-top:6px; }
+.contact-item{ font-size:.88rem; color:#666; display:flex; align-items:center; }
+.contact-item i{ font-size:1.05rem; color:var(--ink); margin-right:8px; }
+.contact-item b{ color:var(--ink); font-weight:800; margin-right:8px; }
+.contact-item a{ color:#666; text-decoration:none; word-break:break-all; }
+.contact-item a:hover{ color:var(--ink); text-decoration:underline; }
+.section{
+  border:1.5px solid var(--line); border-radius:16px; padding:36px 28px; margin-bottom:36px; background:#fff;
+}
+.section h3{
+  font-size:1.5rem; font-weight:900; text-align:center; letter-spacing:2px; margin:0 auto 32px; text-transform:none;
+  padding-bottom:18px; border-bottom:2px solid var(--ink); width:80%;
+}
+.platform-group{ margin-bottom:32px; text-align:center; }
+.platform-group:last-child{ margin-bottom:0; }
+.badge{
+  display:inline-block; border:1.5px solid var(--line); color:#666; background:#fafafa; font-size:.74rem; font-weight:700;
+  padding:6px 18px; border-radius:999px; margin-bottom:18px; letter-spacing:2px; text-transform:uppercase;
+}
+.empty-state{
+  border:1.5px dashed var(--line); border-radius:10px; padding:28px; text-align:center; color:var(--muted); font-size:.88rem;
+}
+.section-hint{ color:var(--muted); font-size:.8rem; margin:-4px 0 10px; }
+.card-grid{
+  display:flex; flex-wrap:wrap; justify-content:center; gap:20px;
+}
+.item-card{ display:flex; flex-direction:column; width:180px; }
+.item-img-wrap{
+  aspect-ratio:1/1; border-radius:6px; overflow:hidden; background:var(--p1); position:relative;
+}
+.item-img{ width:100%; height:100%; object-fit:cover; display:block; }
+.item-img.screenshot-img{ object-position:left top; }
+.no-image-placeholder{
+  display:none; position:absolute; inset:0; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; color:rgba(17,17,17,.32); font-size:.7rem; text-align:center; padding:10px;
+}
+.no-image-placeholder i{ font-size:1.6rem; margin:0; }
+.no-image-placeholder.visible{ display:flex; }
+.item-img-wrap.img-failed .no-image-placeholder{ display:flex; }
+.miri-placeholder{
+  width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; color:var(--ink); font-weight:800; font-size:.85rem; text-align:center; padding:10px; letter-spacing:1px;
+}
+.miri-placeholder i{ font-size:1.8rem; margin:0; opacity:.55; }
+.item-info{ padding:10px 1px 0; }
+.anim-badge{ display:inline-block; font-size:.68rem; font-weight:800; letter-spacing:1px; color:#666; background:#f0f0f0; border-radius:999px; padding:2px 10px; margin-bottom:6px; }
+.item-title{ font-weight:700; font-size:.8rem; color:var(--ink); margin-bottom:3px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.item-link{ font-size:.76rem; color:var(--muted); text-decoration:none; font-weight:600; }
+.item-link:hover{ color:var(--ink); text-decoration:underline; }
+.item-link-text{ font-size:.7rem; color:var(--muted); word-break:break-all; }
+.p1{background:var(--p1);} .p2{background:var(--p2);} .p3{background:var(--p3);}
+.p4{background:var(--p4);} .p5{background:var(--p5);} .p6{background:var(--p6);}
+.anim-grid .item-card{ background:transparent; }
+.video-wrap{ position:relative; width:100%; aspect-ratio:16/9; border-radius:6px; overflow:hidden; background:#f5f5f5; }
+.video-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:none; }
+.video-wrap.vertical{ aspect-ratio:9/16; }
+.video-wrap > img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+.video-wrap.img-failed .no-image-placeholder{ display:flex; }
+.action-bar{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+
+/* ===== edit page ===== */
+.edit-page h2{ font-size:1.25rem; font-weight:900; letter-spacing:1px; }
+.edit-layout{ display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; }
+.preview-pane{ flex:1 1 0; min-width:280px; }
+.preview-label{ font-size:.78rem; font-weight:800; color:var(--muted); margin-bottom:8px; text-align:center; letter-spacing:3px; text-transform:uppercase; }
+.preview-page{
+  background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:28px;
+  min-height:700px; box-shadow:0 6px 24px rgba(0,0,0,.07);
+}
+.edit-form-pane{ flex:1 1 0; min-width:280px; }
+@media (max-width: 860px){
+  .preview-pane, .edit-form-pane{ flex:none; width:100%; }
+}
+.edit-field{ margin-bottom:14px; }
+.edit-field label{ display:block; font-weight:700; font-size:.88rem; margin-bottom:6px; }
+.edit-field input{
+  width:100%; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; font-size:.95rem; font-family:inherit;
+}
+.edit-section{ background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:18px; margin-bottom:18px; }
+.edit-section h3{
+  margin:0 0 14px; text-align:left; font-size:1.05rem; letter-spacing:1px; text-transform:none;
+  border-bottom:1.5px solid var(--line); padding-bottom:12px;
+}
+.edit-platform{ margin-bottom:18px; }
+.edit-platform h4{ font-size:.92rem; color:var(--ink); margin-bottom:4px; font-weight:800; }
+.entry-list{ display:flex; flex-direction:column; gap:10px; }
+.entry-card{ border:1.5px solid var(--line); border-radius:12px; padding:12px; background:#fafafa; }
+.entry-row{ display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.entry-row input{
+  flex:1 1 160px; border:1.5px solid var(--line); border-radius:8px; padding:9px 10px; font-size:.88rem; font-family:inherit;
+  min-width:0; background:#fff;
+}
+.preview-thumb{ max-width:120px; max-height:120px; border-radius:8px; margin-top:6px; object-fit:cover; }
+.fetch-status{ font-size:.78rem; color:#444; margin-top:6px; font-weight:600; }
+
+/* ===== save bar ===== */
+.save-bar{
+  position:sticky; bottom:0; background:rgba(255,255,255,.96); backdrop-filter:blur(6px);
+  border:1.5px solid var(--line); border-radius:16px; padding:14px 18px; margin-top:10px;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:space-between;
+}
+.save-indicator{ font-size:.85rem; font-weight:700; }
+.save-indicator.unsaved{ color:#b45309; }
+.save-indicator.saved{ color:#15803d; }
+.save-bar .right{ display:flex; gap:8px; }
+
+/* ===== toast ===== */
+.toast{
+  position:fixed; bottom:24px; left:50%; transform:translate(-50%,20px); opacity:0;
+  background:var(--ink); color:#fff; padding:12px 22px; border-radius:999px; font-size:.9rem;
+  font-weight:600; transition:all .3s ease; z-index:999;
+}
+.toast.show{ opacity:1; transform:translate(-50%,0); }
+
+/* ===== admin ===== */
+.admin-page h2{ margin-top:0; font-weight:900; letter-spacing:1px; }
+.admin-stats{ display:flex; gap:12px; flex-wrap:wrap; margin:18px 0; }
+.stat-box{ flex:1 1 110px; border:1.5px solid var(--line); border-radius:14px; padding:16px 10px; text-align:center; background:#fafafa; }
+.stat-num{ font-size:1.8rem; font-weight:900; }
+.stat-label{ font-size:.78rem; color:var(--muted); margin-top:4px; letter-spacing:1px; }
+.admin-table{ width:100%; border-collapse:collapse; background:#fff; border:1.5px solid var(--line); border-radius:14px; overflow:hidden; margin-top:14px; }
+.admin-table th, .admin-table td{ padding:12px 10px; text-align:center; border-bottom:1px solid var(--line); font-size:.9rem; }
+.admin-table th{ background:#fafafa; font-weight:800; }
+.admin-table tbody tr{ cursor:pointer; transition:background .15s; }
+.admin-table tbody tr:hover{ background:#fafafa; }
+.admin-table tbody tr:last-child td{ border-bottom:none; }
+.admin-table td i{ margin-right:4px; color:var(--muted); }
+.tag{ padding:4px 10px; border-radius:999px; font-size:.75rem; font-weight:700; }
+.tag.done{ background:#dcfce7; color:#15803d; }
+.tag.empty{ background:#fee2e2; color:#b91c1c; }
+.hint{ color:var(--muted); font-size:.85rem; margin-top:10px; }
+#admin-progress{ margin-top:12px; font-weight:700; text-align:center; }
+
+/* ===== pdf render area ===== */
+#pdf-render-area{ position:absolute; left:-99999px; top:0; width:760px; background:#fff; }
+.pdf-doc{ padding:30px; font-family:inherit; }
+
+.site-footer{ text-align:center; color:#c4c4c4; font-size:.72rem; line-height:1.7; margin-top:50px; padding:0 20px; }
+.site-footer p{ margin:0; }
+
+@media (max-width:480px){
+  .topbar-wrap{ padding:50px 20px 10px; }
+  .hub-header h1{ font-size:1.65rem; }
+  .profile-header{ flex-direction:column; text-align:center; }
+  .profile-header h2{ font-size:1.9rem; }
+  .contact-info{ justify-content:center; }
+}
+</style>
+</head>
+<body>
+<script>
+window.onerror = function(msg, url, line, col, err){
+  var app = document.getElementById('app');
+  if(app){
+    app.innerHTML = '<div class="error-box"><b>오류가 발생했습니다.</b><br>이 메시지를 캡처해서 알려주시면 빠르게 고칠 수 있어요.<br><pre>' + msg + ' (line ' + line + ', col ' + col + ')</pre></div>';
+  }
+  return false;
+};
+</script>
+<div id="app"><div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</div></div>
+<div id="pdf-render-area"></div>
+
+<script>
+/* ===================== SUPABASE (storage backend) ===================== */
+const SUPABASE_URL = "https://kgjbxhxknxgbmsihvshe.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_1K_wet7KC7fq7aPn6vB5dQ_nldPYACn";
+const KV_TABLE = 'char_ip_portfolio_kv';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+window.storage = {
+  async get(key, shared){
+    const { data, error } = await sb.from(KV_TABLE).select('value').eq('key', key).maybeSingle();
+    if(error) throw error;
+    if(!data) throw new Error('not found: ' + key);
+    return { key, value: JSON.stringify(data.value), shared: !!shared };
+  },
+  async set(key, value, shared){
+    const { error } = await sb.from(KV_TABLE).upsert({ key, value: JSON.parse(value), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    if(error){ console.error(error); return null; }
+    return { key, value, shared: !!shared };
+  },
+  async delete(key, shared){
+    const { error } = await sb.from(KV_TABLE).delete().eq('key', key);
+    if(error){ console.error(error); return null; }
+    return { key, deleted:true, shared: !!shared };
+  },
+  async list(prefix, shared){
+    let q = sb.from(KV_TABLE).select('key');
+    if(prefix) q = q.like('key', prefix + '%');
+    const { data, error } = await q;
+    if(error) throw error;
+    return { keys:(data||[]).map(d=>d.key), prefix, shared: !!shared };
+  }
+};
+
+let view='loading';
+let config=null;
+let currentIdx=null;
+let viewData=null;
+let editData=null;
+let adminData=[];
+let hasUnsavedChanges=false;
+let previewTimer=null;
+const PASTELS = ['p1','p2','p3','p4','p5','p6'];
+
+const app = document.getElementById('app');
+
+/* ===================== UTIL ===================== */
+function escapeHtml(str){
+  if(str===undefined||str===null) return '';
+  return String(str).replace(/[&<>"']/g, function(c){
+    if(c==='&') return '&amp;';
+    if(c==='<') return '&lt;';
+    if(c==='>') return '&gt;';
+    if(c==='"') return '&quot;';
+    return '&#39;';
+  });
+}
+function maskName(name){
+  name = (name||'').trim();
+  if(name.length<=1) return name;
+  if(name.length===2) return name[0]+'\u25CB';
+  return name[0] + '\u25CB'.repeat(name.length-2) + name[name.length-1];
+}
+function emptyData(){
+  return { email:'', instagram:'', youtube:'', emoticons:{ogq:[],line:[]}, stockImages:{miri:[],crowdpic:[]}, animations:[] };
+}
+function getYouTubeId(url){
+  if(!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
+  return m ? m[1] : null;
+}
+function getMiricanvasQuery(url){
+  try{
+    const target = url.match(/^https?:\/\//) ? url : 'https://' + url;
+    const u = new URL(target);
+    if(u.hostname.indexOf('miricanvas.com')!==-1){
+      const q = u.searchParams.get('q');
+      if(q) return q;
+    }
+  }catch(e){}
+  return null;
+}
+function isMiricanvasLink(url){
+  if(!url) return false;
+  try{
+    const target = url.match(/^https?:\/\//) ? url : 'https://' + url;
+    const u = new URL(target);
+    return u.hostname.indexOf('miricanvas.com')!==-1;
+  }catch(e){ return false; }
+}
+function splitLines(text){
+  const NL = String.fromCharCode(10);
+  const CR = String.fromCharCode(13);
+  const parts = text.split(NL);
+  const out = [];
+  for(let i=0;i<parts.length;i++){
+    let s = parts[i];
+    if(s.charAt(s.length-1)===CR) s = s.slice(0,-1);
+    s = s.trim();
+    if(s) out.push(s);
+  }
+  return out;
+}
+function joinLines(arr){
+  return arr.join(String.fromCharCode(10));
+}
+function fetchWithTimeout(url, ms){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), ms);
+  return fetch(url, {signal:controller.signal}).finally(()=>clearTimeout(timer));
+}
+function showToast(msg){
+  const t=document.createElement('div');
+  t.className='toast';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),300); },2500);
+}
+
+/* ===================== RENDER DISPATCH ===================== */
+function render(){
+  let content='';
+  switch(view){
+    case 'loading': content = `<div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</div>`; break;
+    case 'setup': content = renderSetup(); break;
+    case 'setup-edit': content = renderSetupEdit(); break;
+    case 'home': content = renderHome(); break;
+    case 'student-view': content = renderStudentView(false); break;
+    case 'student-view-admin': content = renderStudentView(true); break;
+    case 'student-edit': content = renderStudentEdit(); break;
+    case 'admin-loading': content = `<div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> 전체 학생 데이터를 불러오는 중...</div>`; break;
+    case 'admin': content = renderAdmin(); break;
+    case 'admin-contacts': content = renderAdminContacts(); break;
+    default: content = '';
+  }
+  app.innerHTML = `<div class="topbar-wrap"><div class="topbar" onclick="goHome()">PORTFOLIO</div></div><div class="container">${content}</div><div class="site-footer"><p>© 2026 ODDMOON LAB · 유여진 강사. All rights reserved.</p><p>본 페이지의 코드, 디자인, 이미지를 무단으로 복제·수정·재배포하는 것을 금지합니다.</p></div>`;
+}
+
+/* ===================== SETUP ===================== */
+function renderSetup(){
+  return `
+    <div class="card setup-card">
+      <h2>초기 설정</h2>
+      <p>수업에 참여하는 학생들의 <b>이름</b>을 한 줄에 한 명씩 입력해주세요.<br>(이 이름은 본인 확인 비밀번호로도 사용됩니다)</p>
+      <textarea id="setup-names" rows="10" placeholder="홍길동&#10;김민수&#10;이서연"></textarea>
+      <button class="btn primary" onclick="saveSetup()">설정 완료</button>
+    </div>
+  `;
+}
+async function saveSetup(){
+  const text = document.getElementById('setup-names').value;
+  const names = splitLines(text);
+  if(names.length===0){ alert('이름을 한 명 이상 입력해주세요.'); return; }
+  config = {names:names};
+  try{
+    await window.storage.set('config', JSON.stringify(config), true);
+    view='home'; render();
+  }catch(e){ alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.'); }
+}
+function renderSetupEdit(){
+  const current = escapeHtml(joinLines(config.names));
+  return `
+    <div class="card setup-card">
+      <h2>학생 명단 수정</h2>
+      <p>한 줄에 한 명씩 입력하세요. (이름을 바꾸면 해당 학생의 본인 확인 비밀번호도 함께 바뀝니다)</p>
+      <textarea id="setup-names" rows="10">${current}</textarea>
+      <div class="row">
+        <button class="btn primary" onclick="saveSetupEdit()"><i class="fa-solid fa-floppy-disk"></i>저장</button>
+        <button class="btn ghost" onclick="goHome()">취소</button>
+      </div>
+    </div>
+  `;
+}
+async function saveSetupEdit(){
+  const text = document.getElementById('setup-names').value;
+  const names = splitLines(text);
+  if(names.length===0){ alert('이름을 한 명 이상 입력해주세요.'); return; }
+  config.names = names;
+  try{
+    await window.storage.set('config', JSON.stringify(config), true);
+    view='home'; render();
+  }catch(e){ alert('저장 중 오류가 발생했습니다.'); }
+}
+
+/* ===================== HOME ===================== */
+function renderHome(){
+  const cards = config.names.map((n,i)=>`
+    <div class="name-card" onclick="openStudent(${i})">
+      <div class="name-avatar"><i class="fa-solid fa-heart"></i><span>${escapeHtml(n[0]||'?')}</span></div>
+      <div class="name-text">${escapeHtml(maskName(n))}</div>
+    </div>`).join('');
+  return `
+    <div class="hub">
+      <div class="hub-header">
+        <h1>디지털드로잉 기반<br><span class="title-underline">창작캐릭터 IP상품화 전문과정</span></h1>
+        <p class="instructor">유여진 강사</p>
+      </div>
+      <div class="name-grid">${cards}</div>
+      <div class="hub-footer">
+        <button class="btn ghost" onclick="openAdmin()"><i class="fa-solid fa-chart-column"></i>관리자 모드</button>
+        <button class="btn ghost" onclick="openEditNames()"><i class="fa-solid fa-gear"></i>명단 수정</button>
+      </div>
+    </div>
+  `;
+}
+function openEditNames(){ view='setup-edit'; render(); }
+
+async function openStudent(i){
+  currentIdx=i;
+  view='student-view';
+  viewData=null;
+  render();
+  viewData = await loadStudentData(i);
+  render();
+}
+async function loadStudentData(i){
+  try{
+    const res = await window.storage.get(`student-${i}`, true);
+    const d = JSON.parse(res.value);
+    const base = emptyData();
+    const out = Object.assign(base, d);
+    out.emoticons = Object.assign({ogq:[],line:[]}, d.emoticons||{});
+    out.stockImages = Object.assign({miri:[],crowdpic:[]}, d.stockImages||{});
+    out.animations = d.animations||[];
+    out.email = d.email||'';
+    out.instagram = d.instagram||'';
+    out.youtube = d.youtube||'';
+    return out;
+  }catch(e){
+    return emptyData();
+  }
+}
+
+/* ===================== PORTFOLIO VIEW ===================== */
+function renderStudentView(isAdminView){
+  if(!viewData) return `<div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</div>`;
+  return `
+    <div class="portfolio-page">
+      <button class="btn ghost back" onclick="${isAdminView?'backToAdmin()':'goHome()'}"><i class="fa-solid fa-arrow-left"></i>${isAdminView?'관리자 화면으로':'홈으로'}</button>
+      <div class="portfolio-content">${renderPortfolioContent(currentIdx, viewData, false)}</div>
+      <div class="action-bar">
+        <button class="btn primary" onclick="downloadCurrentPDF()">PDF로 저장</button>
+        ${isAdminView?'':'<button class="btn secondary" onclick="tryEdit()">내 포트폴리오 수정하기</button>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderPortfolioContent(idx, data, forPDF){
+  const displayName = config.names[idx];
+  let html = `<div class="profile-header"><div><h2>${escapeHtml(displayName)}</h2>`;
+
+  const contacts = [];
+  if(data.email) contacts.push({label:'Email', value:data.email, href:'mailto:'+data.email, icon:'fa-solid fa-envelope'});
+  if(data.instagram) contacts.push({label:'Instagram', value:data.instagram, href:data.instagram, icon:'fa-brands fa-instagram'});
+  if(data.youtube) contacts.push({label:'YouTube', value:data.youtube, href:data.youtube, icon:'fa-brands fa-youtube'});
+  if(contacts.length>0){
+    html += `<div class="contact-info">`;
+    contacts.forEach(c=>{
+      if(forPDF){
+        html += `<div class="contact-item"><b>${c.label}</b><span>${escapeHtml(c.value)}</span></div>`;
+      }else{
+        html += `<div class="contact-item"><i class="${c.icon}"></i><a href="${escapeHtml(c.href)}" target="_blank">${escapeHtml(c.value)}</a></div>`;
+      }
+    });
+    html += `</div>`;
+  }
+  html += `</div></div>`;
+
+  html += renderSection('이모티콘', 'fa-face-smile', [
+    {label:'네이버 OGQ마켓', items:data.emoticons.ogq},
+    {label:'LINE 스토어', items:data.emoticons.line}
+  ], forPDF);
+
+  html += renderSection('스톡이미지', 'fa-image', [
+    {label:'미리캔버스 스톡이미지', items:data.stockImages.miri},
+    {label:'크라우드픽', items:data.stockImages.crowdpic}
+  ], forPDF);
+
+  html += renderAnimationSection(data.animations, forPDF);
+
+  return html;
+}
+
+function renderSection(title, iconClass, groups, forPDF){
+  if(forPDF){
+    const hasAny = groups.some(g=>g.items && g.items.length>0);
+    if(!hasAny) return '';
+  }
+  const heading = forPDF ? title : `<i class="fa-solid ${iconClass}"></i>${title}`;
+  let html = `<div class="section"><h3>${heading}</h3>`;
+  groups.forEach(g=>{
+    if(forPDF && (!g.items || g.items.length===0)) return;
+    html += `<div class="platform-group"><span class="badge">${escapeHtml(g.label)}</span>`;
+    if(g.items && g.items.length>0){
+      html += `<div class="card-grid">`;
+      g.items.forEach((item,i)=>{ html += renderItemCard(item, forPDF, i); });
+      html += `</div>`;
+    }else{
+      html += `<div class="empty-state">아직 등록된 작품이 없어요</div>`;
+    }
+    html += `</div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function renderItemCard(item, forPDF, idx){
+  idx = idx||0;
+  const pastel = PASTELS[idx % PASTELS.length];
+  const isMiri = isMiricanvasLink(item.link);
+  const hasImg = !isMiri && item.image && item.image.trim();
+  let imgSrc = '';
+  let isScreenshot = false;
+  if(hasImg){
+    imgSrc = item.image.trim();
+  }else if(!forPDF && !isMiri && item.link && item.link.trim()){
+    let target = item.link.trim();
+    if(!/^https?:\/\//i.test(target)) target = 'https://' + target;
+    imgSrc = `https://image.thum.io/get/width/640/crop/480/viewportWidth/1600/noanimate/${target}`;
+    isScreenshot = true;
+  }
+  let inner = '';
+  if(isMiri){
+    inner += `<div class="miri-placeholder"><i class="fa-solid fa-images"></i><span>스톡이미지 모음</span></div>`;
+  }else if(imgSrc){
+    const cors = forPDF ? ' crossorigin="anonymous"' : '';
+    const imgClass = isScreenshot ? 'item-img screenshot-img' : 'item-img';
+    inner += `<img src="${escapeHtml(imgSrc)}"${cors} class="${imgClass}" onerror="this.style.display='none';this.closest('.item-img-wrap').classList.add('img-failed')">`;
+  }
+  if(!forPDF && !isMiri){
+    if(imgSrc){
+      inner += `<div class="no-image-placeholder"><i class="fa-solid fa-circle-exclamation"></i><span>이미지를 불러올 수 없어요</span></div>`;
+    }else{
+      inner += `<div class="no-image-placeholder visible"><i class="fa-solid fa-link"></i><span>미리보기 이미지 없음</span></div>`;
+    }
+  }
+  return `
+    <div class="item-card">
+      <div class="item-img-wrap ${pastel}">${inner}</div>
+      <div class="item-info">
+        <div class="item-title">${escapeHtml(item.title || '제목 미입력')}</div>
+        ${forPDF ? `<div class="item-link-text">${escapeHtml(item.link||'')}</div>` : `<a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`}
+      </div>
+    </div>
+  `;
+}
+
+function getAnimAspect(url){
+  if(!url) return '16-9';
+  if(/\/shorts\//i.test(url) || /instagram\.com\/(reel|reels)\//i.test(url)) return '9-16';
+  return '16-9';
+}
+
+function getAnimLabel(url, ytId){
+  if(ytId){
+    return /\/shorts\//i.test(url||'') ? '유튜브 쇼츠' : '유튜브';
+  }
+  if(/instagram\.com\/(reel|reels)\//i.test(url||'')) return '인스타 릴스';
+  if(/instagram\.com/i.test(url||'')) return '인스타그램';
+  return '';
+}
+
+function renderAnimEmbed(item, ytId, aspect){
+  const wrapClass = aspect==='9-16' ? 'video-wrap vertical' : 'video-wrap';
+  const label = getAnimLabel(item.link, ytId);
+  const badge = label ? `<div class="anim-badge">${escapeHtml(label)}</div>` : '';
+  return `
+    <div class="item-card">
+      <div class="${wrapClass}"><iframe src="https://www.youtube.com/embed/${ytId}" allowfullscreen></iframe></div>
+      <div class="item-info">${badge}<div class="item-title">${escapeHtml(item.title||'제목 미입력')}</div><a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a></div>
+    </div>`;
+}
+
+function renderAnimThumb(item, ytId, aspect, forPDF){
+  const wrapClass = aspect==='9-16' ? 'video-wrap vertical' : 'video-wrap';
+  let imgSrc = '';
+  if(ytId){
+    imgSrc = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+  }else if(item.image && item.image.trim()){
+    imgSrc = item.image.trim();
+  }else if(!forPDF && item.link && item.link.trim()){
+    let target = item.link.trim();
+    if(!/^https?:\/\//i.test(target)) target = 'https://' + target;
+    imgSrc = aspect==='9-16'
+      ? `https://image.thum.io/get/width/360/crop/640/viewportWidth/420/noanimate/${target}`
+      : `https://image.thum.io/get/width/640/crop/360/viewportWidth/1280/noanimate/${target}`;
+  }
+  const cors = forPDF ? ' crossorigin="anonymous"' : '';
+  let inner = '';
+  if(imgSrc){
+    inner += `<img src="${escapeHtml(imgSrc)}"${cors} class="item-img" onerror="this.style.display='none';this.closest('.video-wrap').classList.add('img-failed')">`;
+  }
+  if(!forPDF){
+    if(imgSrc){
+      inner += `<div class="no-image-placeholder"><i class="fa-solid fa-circle-exclamation"></i><span>이미지를 불러올 수 없어요</span></div>`;
+    }else{
+      inner += `<div class="no-image-placeholder visible"><i class="fa-solid fa-link"></i><span>미리보기 이미지 없음</span></div>`;
+    }
+  }
+  const label = getAnimLabel(item.link, ytId);
+  let infoHtml = label ? `<div class="anim-badge">${escapeHtml(label)}</div>` : '';
+  infoHtml += `<div class="item-title">${escapeHtml(item.title||'제목 미입력')}</div>`;
+  if(forPDF){
+    infoHtml += `<div class="item-link-text">${escapeHtml(item.link||'')}</div>`;
+  }else{
+    infoHtml += `<a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`;
+  }
+  return `
+    <div class="item-card">
+      <div class="${wrapClass}">${inner}</div>
+      <div class="item-info">${infoHtml}</div>
+    </div>`;
+}
+
+function renderAnimationSection(animations, forPDF){
+  if(forPDF && (!animations || animations.length===0)) return '';
+  const heading = forPDF ? '애니메이션 (유튜브 쇼츠 / 인스타 릴스)' : '<i class="fa-solid fa-film"></i>애니메이션 (유튜브 쇼츠 / 인스타 릴스)';
+  let html = `<div class="section"><h3>${heading}</h3>`;
+  if(animations && animations.length>0){
+    html += `<div class="card-grid anim-grid">`;
+    animations.forEach((item)=>{
+      const ytId = getYouTubeId(item.link);
+      const aspect = getAnimAspect(item.link);
+      if(ytId && !forPDF){
+        html += renderAnimEmbed(item, ytId, aspect);
+      }else{
+        html += renderAnimThumb(item, ytId, aspect, forPDF);
+      }
+    });
+    html += `</div>`;
+  }else{
+    html += `<div class="empty-state">아직 등록된 작품이 없어요</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+/* ===================== EDIT FLOW ===================== */
+function tryEdit(){
+  const input = prompt('본인 확인을 위해 실명을 입력해주세요.');
+  if(input===null) return;
+  if(input.trim() === (config.names[currentIdx]||'').trim()){
+    editData = JSON.parse(JSON.stringify(viewData));
+    hasUnsavedChanges=false;
+    view='student-edit'; render();
+  }else{
+    alert('이름이 일치하지 않습니다. 다시 확인해주세요.');
+  }
+}
+
+function goHome(){
+  if(view==='student-edit' && hasUnsavedChanges){
+    if(!confirm('저장하지 않은 변경사항이 있습니다. 정말 나가시겠습니까?')) return;
+  }
+  view='home'; render();
+}
+function backToAdmin(){ view='admin'; render(); }
+
+function renderStudentEdit(){
+  const realName = config.names[currentIdx];
+  let html = `<div class="portfolio-page edit-page">`;
+  html += `<button class="btn ghost back" onclick="goHome()"><i class="fa-solid fa-arrow-left"></i>홈으로</button>`;
+  html += `<div class="edit-layout">`;
+  html += `<div class="preview-pane"><div class="preview-label">PDF 미리보기 (A4)</div><div class="preview-page" id="preview-page">${renderPortfolioContent(currentIdx, editData, false)}</div></div>`;
+  html += `<div class="edit-form-pane">`;
+  html += `<h2>${escapeHtml(realName)}님의 포트폴리오 수정</h2>`;
+
+  html += `<div class="edit-field">
+    <label>이메일 주소 (선택)</label>
+    <input type="text" value="${escapeHtml(editData.email)}" oninput="updateField('email',null,this.value)" placeholder="example@email.com">
+  </div>`;
+  html += `<div class="edit-field">
+    <label>인스타그램 주소 (선택)</label>
+    <input type="text" value="${escapeHtml(editData.instagram)}" oninput="updateField('instagram',null,this.value)" placeholder="https://instagram.com/아이디">
+  </div>`;
+  html += `<div class="edit-field">
+    <label>유튜브 주소 (선택)</label>
+    <input type="text" value="${escapeHtml(editData.youtube)}" oninput="updateField('youtube',null,this.value)" placeholder="https://youtube.com/@채널명">
+  </div>`;
+
+  html += renderEditGroup('이모티콘', 'fa-face-smile', [
+    {key:'ogq', label:'네이버 OGQ마켓', hint:'OGQ마켓에 출시한 이모티콘 스토어 페이지 링크를 입력하세요'},
+    {key:'line', label:'LINE 스토어', hint:'LINE 스토어에 출시한 이모티콘 페이지 링크를 입력하세요'}
+  ], 'emoticons');
+
+  html += renderEditGroup('스톡이미지', 'fa-image', [
+    {key:'miri', label:'미리캔버스 스톡이미지 마켓', hint:'미리캔버스 스톡 마켓에 등록한 이미지 페이지 링크를 입력하세요'},
+    {key:'crowdpic', label:'크라우드픽', hint:'크라우드픽에 등록한 이미지 페이지 링크를 입력하세요'}
+  ], 'stockImages');
+
+  html += renderEditAnimationGroup();
+
+  html += `
+    <div class="save-bar">
+      <span id="save-indicator" class="save-indicator ${hasUnsavedChanges?'unsaved':'saved'}">${hasUnsavedChanges?'<i class="fa-solid fa-triangle-exclamation"></i>저장되지 않은 변경사항이 있어요':'<i class="fa-solid fa-circle-check"></i>모두 저장됨'}</span>
+      <div class="right">
+        <button class="btn primary" onclick="saveStudentData()"><i class="fa-solid fa-floppy-disk"></i>저장하기</button>
+        <button class="btn secondary" onclick="finishEditing()">완료 (포트폴리오 보기)</button>
+      </div>
+    </div>
+  `;
+  html += `</div>`; // edit-form-pane
+  html += `</div>`; // edit-layout
+  html += `</div>`; // portfolio-page
+  return html;
+}
+
+function renderEditGroup(title, iconClass, subs, category){
+  let html = `<div class="edit-section"><h3><i class="fa-solid ${iconClass}"></i>${title}</h3>`;
+  subs.forEach(sub=>{
+    html += `<div class="edit-platform"><h4>${escapeHtml(sub.label)}</h4>`;
+    if(sub.hint) html += `<p class="section-hint">${escapeHtml(sub.hint)}</p>`;
+    html += `<div class="entry-list">`;
+    if(editData[category][sub.key].length===0){
+      html += `<div class="empty-state">아직 추가된 항목이 없어요. 아래 버튼을 눌러 추가하세요.</div>`;
+    }
+    editData[category][sub.key].forEach((item,idx)=>{
+      html += renderEntryEditor(category, sub.key, idx, item);
+    });
+    html += `</div><button class="btn add" onclick="addEntry('${category}','${sub.key}')"><i class="fa-solid fa-plus"></i>항목 추가</button></div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function renderEditAnimationGroup(){
+  let html = `<div class="edit-section"><h3><i class="fa-solid fa-film"></i>애니메이션 (유튜브 쇼츠 / 인스타 릴스)</h3>`;
+  html += `<p class="section-hint">유튜브 쇼츠 또는 인스타그램 릴스에 업로드한 영상 링크를 입력하세요</p>`;
+  html += `<div class="entry-list">`;
+  if(editData.animations.length===0){
+    html += `<div class="empty-state">아직 추가된 항목이 없어요. 아래 버튼을 눌러 추가하세요.</div>`;
+  }
+  editData.animations.forEach((item,idx)=>{
+    html += renderEntryEditor('animations','',idx,item);
+  });
+  html += `</div><button class="btn add" onclick="addEntry('animations','')"><i class="fa-solid fa-plus"></i>항목 추가</button></div>`;
+  return html;
+}
+
+function renderEntryEditor(category, sub, idx, item){
+  const path = sub ? `${category}.${sub}.${idx}` : `${category}.${idx}`;
+  let html = `<div class="entry-card">`;
+  html += `<div class="entry-row">
+    <input type="text" placeholder="링크 주소 (https://...)" value="${escapeHtml(item.link)}" oninput="updateField('${path}','link',this.value)">
+    <button class="btn small" onclick="fetchPreviewForEntry('${category}','${sub}',${idx})"><i class="fa-solid fa-magnifying-glass"></i>미리보기 불러오기</button>
+    <button class="btn small danger" onclick="removeEntry('${category}','${sub}',${idx})"><i class="fa-solid fa-trash"></i>삭제</button>
+  </div>`;
+  html += `<div class="entry-row">
+    <input type="text" placeholder="작품 제목" value="${escapeHtml(item.title)}" oninput="updateField('${path}','title',this.value)">
+    <input type="text" placeholder="이미지 주소 (자동 입력되거나 직접 입력)" value="${escapeHtml(item.image||'')}" oninput="updateField('${path}','image',this.value)">
+  </div>`;
+  if(item.image){
+    html += `<img src="${escapeHtml(item.image)}" class="preview-thumb" onerror="this.style.display='none'">`;
+  }
+  if(item._status){
+    const ic = item._status.type==='loading' ? 'fa-spinner fa-spin' : (item._status.type==='ok' ? 'fa-circle-check' : 'fa-triangle-exclamation');
+    html += `<div class="fetch-status"><i class="fa-solid ${ic}"></i>${escapeHtml(item._status.msg)}</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function updateField(path, field, value){
+  const parts = path.split('.');
+  let obj = editData;
+  for(let i=0;i<parts.length;i++){
+    if(i===parts.length-1){
+      if(field===null){ obj[parts[i]] = value; }
+      else { obj = obj[parts[i]]; obj[field] = value; }
+    }else{
+      obj = obj[parts[i]];
+    }
+  }
+  hasUnsavedChanges=true;
+  updateSaveIndicator();
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(updatePreview, 400);
+}
+function updatePreview(){
+  const el = document.getElementById('preview-page');
+  if(el) el.innerHTML = renderPortfolioContent(currentIdx, editData, false);
+}
+
+function addEntry(category, sub){
+  const entry = {title:'', link:'', image:''};
+  if(sub) editData[category][sub].push(entry);
+  else editData[category].push(entry);
+  hasUnsavedChanges=true;
+  render();
+}
+function removeEntry(category, sub, idx){
+  if(!confirm('이 항목을 삭제할까요?')) return;
+  if(sub) editData[category][sub].splice(idx,1);
+  else editData[category].splice(idx,1);
+  hasUnsavedChanges=true;
+  render();
+}
+
+function updateSaveIndicator(){
+  const el = document.getElementById('save-indicator');
+  if(!el) return;
+  if(hasUnsavedChanges){
+    el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>저장되지 않은 변경사항이 있어요';
+    el.className = 'save-indicator unsaved';
+  }else{
+    el.innerHTML = '<i class="fa-solid fa-circle-check"></i>모두 저장됨';
+    el.className = 'save-indicator saved';
+  }
+}
+
+/* ===================== PREVIEW FETCH ===================== */
+async function fetchPreviewForEntry(category, sub, idx){
+  const item = sub ? editData[category][sub][idx] : editData[category][idx];
+  if(!item.link || !item.link.trim()){ alert('먼저 링크를 입력해주세요.'); return; }
+  item._status = {type:'loading', msg:'불러오는 중...'};
+  render();
+  const preview = await fetchPreview(item.link.trim());
+  if(preview && (preview.title || preview.image)){
+    if(preview.title && !item.title) item.title = preview.title;
+    if(preview.image && !item.image) item.image = preview.image;
+    item._status = {type:'ok', msg:'불러왔어요 (필요하면 직접 수정 가능)'};
+  }else{
+    item._status = {type:'fail', msg:'자동 불러오기에 실패했어요. 제목과 이미지 주소를 직접 입력해주세요.'};
+  }
+  hasUnsavedChanges=true;
+  render();
+}
+
+async function fetchPreview(url){
+  const ytId = getYouTubeId(url);
+  if(ytId){
+    try{
+      const res = await fetchWithTimeout(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, 8000);
+      if(res.ok){
+        const d = await res.json();
+        return {title:d.title||'', image:d.thumbnail_url||''};
+      }
+    }catch(e){}
+  }
+  const mq = getMiricanvasQuery(url);
+  if(mq){
+    return {title: `${mq} 스톡이미지 모음`, image:''};
+  }
+  try{
+    const res = await fetchWithTimeout(`https://api.microlink.io/?url=${encodeURIComponent(url)}&palette=false`, 9000);
+    if(res.ok){
+      const json = await res.json();
+      if(json && json.status==='success' && json.data){
+        const d = json.data;
+        const img = (d.image && d.image.url) || (d.screenshot && d.screenshot.url) || '';
+        const title = d.title || '';
+        if(title || img){
+          return {title:title, image:img};
+        }
+      }
+    }
+  }catch(e){}
+  const proxies = [
+    u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`
+  ];
+  for(const proxyFn of proxies){
+    try{
+      const res = await fetchWithTimeout(proxyFn(url), 8000);
+      if(!res.ok) continue;
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html,'text/html');
+      const ogTitleEl = doc.querySelector('meta[property="og:title"]');
+      const ogImageEl = doc.querySelector('meta[property="og:image"]');
+      const ogTitle = ogTitleEl ? ogTitleEl.getAttribute('content') : '';
+      const ogImage = ogImageEl ? ogImageEl.getAttribute('content') : '';
+      const titleEl = doc.querySelector('title');
+      const title = ogTitle || (titleEl ? titleEl.textContent : '') || '';
+      if(title.trim() || ogImage){
+        return {title:(title||'').trim(), image: ogImage||''};
+      }
+    }catch(e){ continue; }
+  }
+  try{
+    const target = url.match(/^https?:\/\//) ? url : 'https://' + url;
+    const res = await fetchWithTimeout(`https://r.jina.ai/${target}`, 9000);
+    if(res.ok){
+      const text = await res.text();
+      const m = text.match(/^Title:\s*(.+)$/m);
+      if(m && m[1] && m[1].trim()){
+        return {title: m[1].trim(), image: ''};
+      }
+    }
+  }catch(e){}
+  return null;
+}
+
+/* ===================== SAVE ===================== */
+function cleanStatuses(data){
+  data.emoticons.ogq.forEach(it=>delete it._status);
+  data.emoticons.line.forEach(it=>delete it._status);
+  data.stockImages.miri.forEach(it=>delete it._status);
+  data.stockImages.crowdpic.forEach(it=>delete it._status);
+  data.animations.forEach(it=>delete it._status);
+}
+
+async function saveStudentData(){
+  if(typeof window.storage === 'undefined' || !window.storage){
+    alert('저장 기능을 사용할 수 없는 환경입니다.\n이 페이지를 파일로 직접 열었거나, Claude 아티팩트 미리보기가 아닌 다른 곳(예: 외부 웹사이트)에 올려서 보고 있을 가능성이 높아요.\nClaude 대화창의 아티팩트 미리보기 화면(또는 공유 링크)에서 이용해주세요.');
+    return;
+  }
+  const clean = JSON.parse(JSON.stringify(editData));
+  cleanStatuses(clean);
+  const payload = JSON.stringify(clean);
+
+  const byteLen = new TextEncoder().encode(payload).length;
+  if(byteLen > 4500000){
+    alert('저장할 내용의 용량이 너무 큽니다 (' + Math.round(byteLen/1024) + 'KB).\n"이미지 주소" 칸에 매우 긴 텍스트(예: data:image/...로 시작하는 값)가 들어있는지 확인하고, 일반적인 https:// 이미지 링크로 바꿔주세요.');
+    return;
+  }
+
+  let success = false;
+  let lastError = null;
+  for(let attempt=0; attempt<3; attempt++){
+    try{
+      const result = await window.storage.set(`student-${currentIdx}`, payload, true);
+      if(result){ success=true; break; }
+      lastError = '저장 결과가 비어있음';
+    }catch(e){
+      lastError = (e && e.message) ? e.message : String(e);
+    }
+    if(attempt<2) await new Promise(r=>setTimeout(r,600));
+  }
+  if(success){
+    viewData = clean;
+    hasUnsavedChanges=false;
+    updateSaveIndicator();
+    showToast('저장되었습니다! (' + new Date().toLocaleTimeString('ko-KR') + ')');
+  }else{
+    alert('저장 중 오류가 발생했습니다. 입력한 내용은 화면에 남아있으니, 인터넷 연결을 확인하고 "저장하기"를 다시 눌러주세요.\n(상세: ' + (lastError||'알 수 없음') + ')');
+  }
+}
+
+async function finishEditing(){
+  if(hasUnsavedChanges){
+    if(confirm('저장하지 않은 변경사항이 있습니다. 저장하고 포트폴리오 화면으로 이동할까요?')){
+      await saveStudentData();
+    }
+  }
+  const clean = JSON.parse(JSON.stringify(editData));
+  cleanStatuses(clean);
+  viewData = clean;
+  view='student-view'; render();
+}
+
+/* ===================== PDF ===================== */
+function waitForImages(container){
+  const imgs = container.querySelectorAll('img');
+  return Promise.all(Array.from(imgs).map(img=>{
+    if(img.complete) return Promise.resolve();
+    return new Promise(res=>{ img.onload=res; img.onerror=res; setTimeout(res,3000); });
+  }));
+}
+function addCanvasPages(pdf, canvas, isFirst){
+  const imgW=210;
+  const imgH = canvas.height * imgW / canvas.width;
+  let heightLeft = imgH, position = 0;
+  const imgData = canvas.toDataURL('image/png');
+  if(!isFirst) pdf.addPage();
+  pdf.addImage(imgData,'PNG',0,position,imgW,imgH);
+  heightLeft -= 297;
+  while(heightLeft > 0){
+    position = heightLeft - imgH;
+    pdf.addPage();
+    pdf.addImage(imgData,'PNG',0,position,imgW,imgH);
+    heightLeft -= 297;
+  }
+}
+async function downloadCurrentPDF(){
+  const area = document.getElementById('pdf-render-area');
+  area.innerHTML = `<div class="pdf-doc">${renderPortfolioContent(currentIdx, viewData, true)}</div>`;
+  await waitForImages(area);
+  const canvas = await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff'});
+  const jsPDF = window.jspdf.jsPDF;
+  const pdf = new jsPDF('p','mm','a4');
+  addCanvasPages(pdf, canvas, true);
+  pdf.save(`${config.names[currentIdx]}_포트폴리오.pdf`);
+  area.innerHTML='';
+}
+
+/* ===================== ADMIN ===================== */
+async function openAdmin(){
+  const pw = prompt('관리자 비밀번호를 입력하세요.');
+  if(pw === null) return;
+  if(pw.trim() !== '0530'){
+    alert('비밀번호가 일치하지 않습니다.');
+    return;
+  }
+  view='admin-loading'; render();
+  adminData = [];
+  for(let i=0;i<config.names.length;i++){
+    adminData.push(await loadStudentData(i));
+  }
+  view='admin'; render();
+}
+
+function renderAdmin(){
+  let started = 0, completed = 0;
+  const totalStudents = config.names.length;
+
+  const rows = config.names.map((name,i)=>{
+    const d = adminData[i];
+    const emo = d.emoticons.ogq.length + d.emoticons.line.length;
+    const stock = d.stockImages.miri.length + d.stockImages.crowdpic.length;
+    const anim = d.animations.length;
+    const total = emo+stock+anim;
+    if(total>0) started++;
+    if(emo>0 && stock>0 && anim>0) completed++;
+    return `
+      <tr onclick="viewAsAdmin(${i})">
+        <td><b>${escapeHtml(name)}</b></td>
+        <td><i class="fa-solid ${emo>0?'fa-circle-check':'fa-minus'}"></i>${emo}</td>
+        <td><i class="fa-solid ${stock>0?'fa-circle-check':'fa-minus'}"></i>${stock}</td>
+        <td><i class="fa-solid ${anim>0?'fa-circle-check':'fa-minus'}"></i>${anim}</td>
+        <td>${total>0?'<span class="tag done">진행중</span>':'<span class="tag empty">미시작</span>'}</td>
+        <td><button class="btn small danger" onclick="event.stopPropagation();resetStudentData(${i})"><i class="fa-solid fa-rotate-left"></i>초기화</button></td>
+      </tr>`;
+  }).join('');
+
+  const notStarted = totalStudents - started;
+
+  return `
+    <div class="admin-page">
+      <button class="btn ghost back" onclick="goHome()"><i class="fa-solid fa-arrow-left"></i>홈으로</button>
+      <h2><i class="fa-solid fa-chart-column"></i>관리자 모드 - 전체 현황</h2>
+      <div class="admin-stats">
+        <div class="stat-box"><div class="stat-num">${totalStudents}</div><div class="stat-label">전체 학생</div></div>
+        <div class="stat-box"><div class="stat-num">${started}</div><div class="stat-label">진행중</div></div>
+        <div class="stat-box"><div class="stat-num">${completed}</div><div class="stat-label">3개 영역 모두 등록</div></div>
+        <div class="stat-box"><div class="stat-num">${notStarted}</div><div class="stat-label">미시작</div></div>
+      </div>
+      <div class="action-bar">
+        <button class="btn primary" onclick="downloadAllPDF()"><i class="fa-solid fa-download"></i>전체 포트폴리오 PDF 한번에 다운로드</button>
+        <button class="btn secondary" onclick="openContactList()"><i class="fa-solid fa-address-book"></i>연락처 목록 보기</button>
+      </div>
+      <table class="admin-table">
+        <thead><tr><th>이름</th><th>이모티콘</th><th>스톡이미지</th><th>애니메이션</th><th>상태</th><th>관리</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="hint">이름을 클릭하면 해당 학생의 포트폴리오를 확인할 수 있어요.</p>
+      <div id="admin-progress"></div>
+    </div>
+  `;
+}
+
+function openContactList(){
+  view='admin-contacts'; render();
+}
+
+function renderAdminContacts(){
+  const rows = config.names.map((name,i)=>{
+    const d = adminData[i];
+    const email = d.email ? escapeHtml(d.email) : '-';
+    const insta = d.instagram ? `<a href="${escapeHtml(d.instagram)}" target="_blank">${escapeHtml(d.instagram)}</a>` : '-';
+    const yt = d.youtube ? `<a href="${escapeHtml(d.youtube)}" target="_blank">${escapeHtml(d.youtube)}</a>` : '-';
+    return `
+      <tr>
+        <td><b>${escapeHtml(name)}</b></td>
+        <td>${email}</td>
+        <td>${insta}</td>
+        <td>${yt}</td>
+      </tr>`;
+  }).join('');
+  return `
+    <div class="admin-page">
+      <button class="btn ghost back" onclick="backToAdmin()"><i class="fa-solid fa-arrow-left"></i>관리자 화면으로</button>
+      <h2><i class="fa-solid fa-address-book"></i>학생 연락처 목록</h2>
+      <table class="admin-table">
+        <thead><tr><th>이름</th><th>이메일</th><th>인스타그램</th><th>유튜브</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function resetStudentData(i){
+  const name = config.names[i];
+  if(!confirm(`${name} 학생의 포트폴리오 데이터를 초기화할까요?\n이메일/SNS 주소와 등록한 작품이 모두 삭제됩니다.`)) return;
+  if(!confirm('정말로 초기화할까요? 이 작업은 되돌릴 수 없습니다.')) return;
+  try{
+    const empty = emptyData();
+    const result = await window.storage.set(`student-${i}`, JSON.stringify(empty), true);
+    if(result){
+      adminData[i] = empty;
+      showToast(`${name} 학생의 데이터를 초기화했습니다.`);
+      render();
+    }else{
+      alert('초기화 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
+  }catch(e){
+    alert('초기화 중 오류가 발생했습니다.\n(상세: ' + ((e&&e.message)?e.message:String(e)) + ')');
+  }
+}
+
+function viewAsAdmin(i){
+  currentIdx=i;
+  viewData = adminData[i];
+  view='student-view-admin'; render();
+}
+
+async function downloadAllPDF(){
+  const jsPDF = window.jspdf.jsPDF;
+  const pdf = new jsPDF('p','mm','a4');
+  const progressEl = document.getElementById('admin-progress');
+  const area = document.getElementById('pdf-render-area');
+  for(let i=0;i<config.names.length;i++){
+    if(progressEl) progressEl.textContent = 'PDF 생성 중... (' + (i+1) + '/' + config.names.length + ') - ' + config.names[i];
+    const data = adminData[i];
+    area.innerHTML = `<div class="pdf-doc">${renderPortfolioContent(i, data, true)}</div>`;
+    await waitForImages(area);
+    const canvas = await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff'});
+    addCanvasPages(pdf, canvas, i===0);
+  }
+  if(progressEl) progressEl.textContent = '완료! 다운로드를 시작합니다.';
+  pdf.save('전체_학생_포트폴리오.pdf');
+  area.innerHTML='';
+  setTimeout(()=>{ if(progressEl) progressEl.textContent=''; }, 2500);
+}
+
+/* ===================== INIT ===================== */
+async function init(){
+  try{
+    const res = await window.storage.get('config', true);
+    config = JSON.parse(res.value);
+    if(!config.names || !Array.isArray(config.names) || config.names.length < 2) throw new Error('invalid');
+    view='home';
+  }catch(e){
+    const names = [];
+    for(let i=1;i<=20;i++){ names.push('학생'+i); }
+    config = {names:names};
+    try{ await window.storage.set('config', JSON.stringify(config), true); }catch(err){}
+    view='home';
+  }
+  render();
+}
+init();
+</script>
+</body>
+</html>
