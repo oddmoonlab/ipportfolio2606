@@ -260,6 +260,7 @@ i{ margin-right:6px; }
 /* ===== pdf render area ===== */
 #pdf-render-area{ position:absolute; left:-99999px; top:0; width:760px; background:#fff; }
 .pdf-doc{ padding:30px; font-family:inherit; }
+.pdf-chunk{ background:#fff; }
 
 .site-footer{ text-align:center; color:#c4c4c4; font-size:.72rem; line-height:1.7; margin-top:50px; padding:0 20px; }
 .site-footer p{ margin:0; }
@@ -387,6 +388,32 @@ function isMiricanvasLink(url){
     return u.hostname.indexOf('miricanvas.com')!==-1;
   }catch(e){ return false; }
 }
+const HOTLINK_PROTECTED_HOSTS = ['pstatic.net','naver.com','naver.me'];
+function isHotlinkProtected(url){
+  if(!url) return false;
+  try{
+    const target = url.match(/^https?:\/\//) ? url : 'https://' + url;
+    const host = new URL(target).hostname;
+    return HOTLINK_PROTECTED_HOSTS.some(h=>host===h || host.endsWith('.'+h));
+  }catch(e){ return false; }
+}
+function resolveImageSrc(rawSrc){
+  if(!rawSrc) return rawSrc;
+  if(isHotlinkProtected(rawSrc)){
+    return `https://images.weserv.nl/?url=${encodeURIComponent(rawSrc.replace(/^https?:\/\//,''))}`;
+  }
+  return rawSrc;
+}
+function shortLinkLabel(url){
+  if(!url) return '';
+  try{
+    const target = url.match(/^https?:\/\//) ? url : 'https://' + url;
+    const host = new URL(target).hostname.replace(/^www\./,'');
+    return `${host} 바로가기`;
+  }catch(e){
+    return url.length>40 ? url.slice(0,40)+'...' : url;
+  }
+}
 function splitLines(text){
   const NL = String.fromCharCode(10);
   const CR = String.fromCharCode(13);
@@ -451,7 +478,7 @@ async function saveSetup(){
   const text = document.getElementById('setup-names').value;
   const names = splitLines(text);
   if(names.length===0){ alert('이름을 한 명 이상 입력해주세요.'); return; }
-  config = {names:names};
+  config = {names:names, rightClickLocked:true};
   try{
     await window.storage.set('config', JSON.stringify(config), true);
     view='home'; render();
@@ -466,7 +493,7 @@ function renderSetupEdit(){
       <textarea id="setup-names" rows="10">${current}</textarea>
       <div class="row">
         <button class="btn primary" onclick="saveSetupEdit()"><i class="fa-solid fa-floppy-disk"></i>저장</button>
-        <button class="btn ghost" onclick="goHome()">취소</button>
+        <button class="btn ghost" onclick="backToAdmin()">취소</button>
       </div>
     </div>
   `;
@@ -478,7 +505,7 @@ async function saveSetupEdit(){
   config.names = names;
   try{
     await window.storage.set('config', JSON.stringify(config), true);
-    view='home'; render();
+    view='admin'; render();
   }catch(e){ alert('저장 중 오류가 발생했습니다.'); }
 }
 
@@ -615,7 +642,7 @@ function renderItemCard(item, forPDF, idx){
   let imgSrc = '';
   let isScreenshot = false;
   if(hasImg){
-    imgSrc = item.image.trim();
+    imgSrc = resolveImageSrc(item.image.trim());
   }else if(!forPDF && !isMiri && item.link && item.link.trim()){
     let target = item.link.trim();
     if(!/^https?:\/\//i.test(target)) target = 'https://' + target;
@@ -642,7 +669,7 @@ function renderItemCard(item, forPDF, idx){
       <div class="item-img-wrap ${pastel}">${inner}</div>
       <div class="item-info">
         <div class="item-title">${escapeHtml(item.title || '제목 미입력')}</div>
-        ${forPDF ? `<div class="item-link-text">${escapeHtml(item.link||'')}</div>` : `<a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`}
+        ${forPDF ? `<div class="item-link-text">${escapeHtml(shortLinkLabel(item.link))}</div>` : `<a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`}
       </div>
     </div>
   `;
@@ -680,7 +707,7 @@ function renderAnimThumb(item, ytId, aspect, forPDF){
   if(ytId){
     imgSrc = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
   }else if(item.image && item.image.trim()){
-    imgSrc = item.image.trim();
+    imgSrc = resolveImageSrc(item.image.trim());
   }else if(!forPDF && item.link && item.link.trim()){
     let target = item.link.trim();
     if(!/^https?:\/\//i.test(target)) target = 'https://' + target;
@@ -704,7 +731,7 @@ function renderAnimThumb(item, ytId, aspect, forPDF){
   let infoHtml = label ? `<div class="anim-badge">${escapeHtml(label)}</div>` : '';
   infoHtml += `<div class="item-title">${escapeHtml(item.title||'제목 미입력')}</div>`;
   if(forPDF){
-    infoHtml += `<div class="item-link-text">${escapeHtml(item.link||'')}</div>`;
+    infoHtml += `<div class="item-link-text">${escapeHtml(shortLinkLabel(item.link))}</div>`;
   }else{
     infoHtml += `<a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`;
   }
@@ -1051,7 +1078,7 @@ async function finishEditing(){
   view='student-view'; render();
 }
 
-/* ===================== PDF ===================== */
+/* ===================== PDF (chunk-based, avoids mid-element page breaks) ===================== */
 function waitForImages(container){
   const imgs = container.querySelectorAll('img');
   return Promise.all(Array.from(imgs).map(img=>{
@@ -1059,35 +1086,135 @@ function waitForImages(container){
     return new Promise(res=>{ img.onload=res; img.onerror=res; setTimeout(res,3000); });
   }));
 }
-function addCanvasPages(pdf, canvas, isFirst){
-  const imgW=210;
-  const imgH = canvas.height * imgW / canvas.width;
-  let heightLeft = imgH, position = 0;
-  const imgData = canvas.toDataURL('image/png');
-  if(!isFirst) pdf.addPage();
-  pdf.addImage(imgData,'PNG',0,position,imgW,imgH);
-  heightLeft -= 297;
-  while(heightLeft > 0){
-    position = heightLeft - imgH;
-    pdf.addPage();
-    pdf.addImage(imgData,'PNG',0,position,imgW,imgH);
-    heightLeft -= 297;
+
+// Build an array of HTML strings, each representing one "atomic" chunk that should
+// never be split across a PDF page break (profile header, section title+platform badge,
+// a row of cards, or a single card if it doesn't fit a row).
+function buildPdfChunks(idx, data){
+  const displayName = config.names[idx];
+  const chunks = [];
+
+  // profile header chunk
+  let headerHtml = `<div class="profile-header"><div><h2>${escapeHtml(displayName)}</h2>`;
+  const contacts = [];
+  if(data.email) contacts.push({label:'Email', value:data.email});
+  if(data.instagram) contacts.push({label:'Instagram', value:data.instagram});
+  if(data.youtube) contacts.push({label:'YouTube', value:data.youtube});
+  if(contacts.length>0){
+    headerHtml += `<div class="contact-info">`;
+    contacts.forEach(c=>{ headerHtml += `<div class="contact-item"><b>${c.label}</b><span>${escapeHtml(c.value)}</span></div>`; });
+    headerHtml += `</div>`;
   }
+  headerHtml += `</div></div>`;
+  chunks.push(headerHtml);
+
+  function pushSection(title, groups){
+    const hasAny = groups.some(g=>g.items && g.items.length>0);
+    if(!hasAny) return;
+    chunks.push(`<div class="section-title-chunk"><h3>${title}</h3></div>`);
+    groups.forEach(g=>{
+      if(!g.items || g.items.length===0) return;
+      chunks.push(`<div class="platform-badge-chunk"><span class="badge">${escapeHtml(g.label)}</span></div>`);
+      // group cards into rows of 4 so each row is one chunk (keeps cards together but allows row-level breaks)
+      const rowSize = 4;
+      for(let i=0;i<g.items.length;i+=rowSize){
+        const rowItems = g.items.slice(i, i+rowSize);
+        let rowHtml = `<div class="card-grid pdf-row">`;
+        rowItems.forEach((item,ri)=>{ rowHtml += renderItemCard(item, true, i+ri); });
+        rowHtml += `</div>`;
+        chunks.push(rowHtml);
+      }
+    });
+  }
+
+  pushSection('이모티콘', [
+    {label:'네이버 OGQ마켓', items:data.emoticons.ogq},
+    {label:'LINE 스토어', items:data.emoticons.line}
+  ]);
+  pushSection('스톡이미지', [
+    {label:'미리캔버스 스톡이미지', items:data.stockImages.miri},
+    {label:'크라우드픽', items:data.stockImages.crowdpic}
+  ]);
+
+  if(data.animations && data.animations.length>0){
+    chunks.push(`<div class="section-title-chunk"><h3>애니메이션 (유튜브 쇼츠 / 인스타 릴스)</h3></div>`);
+    const rowSize = 4;
+    for(let i=0;i<data.animations.length;i+=rowSize){
+      const rowItems = data.animations.slice(i, i+rowSize);
+      let rowHtml = `<div class="card-grid pdf-row anim-grid">`;
+      rowItems.forEach((item)=>{
+        const ytId = getYouTubeId(item.link);
+        const aspect = getAnimAspect(item.link);
+        rowHtml += renderAnimThumb(item, ytId, aspect, true);
+      });
+      rowHtml += `</div>`;
+      chunks.push(rowHtml);
+    }
+  }
+
+  return chunks;
 }
+
+async function renderChunkToCanvas(area, chunkHtml){
+  area.innerHTML = `<div class="pdf-chunk">${chunkHtml}</div>`;
+  await waitForImages(area);
+  return await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff'});
+}
+
+async function buildPdfForStudent(pdf, idx, data, area, isFirstOverall){
+  const pageWmm = 210, pageHmm = 297, marginMm = 10;
+  const usableWmm = pageWmm - marginMm*2;
+  const usableHmm = pageHmm - marginMm*2;
+  const mmPerPx = usableWmm / area.clientWidth;
+
+  const chunks = buildPdfChunks(idx, data);
+  let cursorYmm = marginMm;
+  let pageStarted = false;
+
+  for(let c=0; c<chunks.length; c++){
+    const canvas = await renderChunkToCanvas(area, chunks[c]);
+    const chunkHmm = canvas.height * mmPerPx;
+    const chunkWmm = usableWmm;
+
+    if(!pageStarted){
+      if(!isFirstOverall || c>0 || true){
+        // start a new page for every student's first chunk except very first page of whole document
+      }
+    }
+
+    const needNewPage = !pageStarted || (cursorYmm + chunkHmm > pageHmm - marginMm);
+    if(needNewPage){
+      if(pageStarted || !isFirstOverall){
+        pdf.addPage();
+      }
+      cursorYmm = marginMm;
+      pageStarted = true;
+    }
+
+    if(chunkHmm > usableHmm){
+      // chunk itself taller than a full page (rare) - place at top of current/new page, allow overflow cut
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData,'PNG',marginMm,cursorYmm,chunkWmm,chunkHmm);
+      cursorYmm = pageHmm; // force next chunk to new page
+    }else{
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData,'PNG',marginMm,cursorYmm,chunkWmm,chunkHmm);
+      cursorYmm += chunkHmm + 4; // small gap between chunks
+    }
+  }
+  area.innerHTML = '';
+}
+
 async function downloadCurrentPDF(){
   const area = document.getElementById('pdf-render-area');
-  area.innerHTML = `<div class="pdf-doc">${renderPortfolioContent(currentIdx, viewData, true)}</div>`;
-  await waitForImages(area);
-  const canvas = await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff'});
   const jsPDF = window.jspdf.jsPDF;
   const pdf = new jsPDF('p','mm','a4');
-  addCanvasPages(pdf, canvas, true);
+  await buildPdfForStudent(pdf, currentIdx, viewData, area, true);
   pdf.save(`${config.names[currentIdx]}_포트폴리오.pdf`);
-  area.innerHTML='';
 }
 
 /* ===================== ADMIN ===================== */
-function showAdminPwModal(){
+async function showAdminPwModal(){
   closeAdminPwModal();
   const overlay = document.createElement('div');
   overlay.id = 'admin-pw-overlay';
@@ -1265,15 +1392,10 @@ async function downloadAllPDF(){
   const area = document.getElementById('pdf-render-area');
   for(let i=0;i<config.names.length;i++){
     if(progressEl) progressEl.textContent = 'PDF 생성 중... (' + (i+1) + '/' + config.names.length + ') - ' + config.names[i];
-    const data = adminData[i];
-    area.innerHTML = `<div class="pdf-doc">${renderPortfolioContent(i, data, true)}</div>`;
-    await waitForImages(area);
-    const canvas = await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff'});
-    addCanvasPages(pdf, canvas, i===0);
+    await buildPdfForStudent(pdf, i, adminData[i], area, i===0);
   }
   if(progressEl) progressEl.textContent = '완료! 다운로드를 시작합니다.';
   pdf.save('전체_학생_포트폴리오.pdf');
-  area.innerHTML='';
   setTimeout(()=>{ if(progressEl) progressEl.textContent=''; }, 2500);
 }
 
