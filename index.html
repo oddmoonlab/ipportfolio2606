@@ -1088,7 +1088,7 @@ async function finishEditing(){
   view='student-view'; render();
 }
 
-/* ===================== PDF (chunk-based, avoids mid-element page breaks) ===================== */
+/* ===================== PDF (whole page as one scaled image, no mid-cut) ===================== */
 function waitForImages(container){
   const imgs = container.querySelectorAll('img');
   return Promise.all(Array.from(imgs).map(img=>{
@@ -1097,121 +1097,30 @@ function waitForImages(container){
   }));
 }
 
-// Build an array of HTML strings, each representing one "atomic" chunk that should
-// never be split across a PDF page break (profile header, section title+platform badge,
-// a row of cards, or a single card if it doesn't fit a row).
-function buildPdfChunks(idx, data){
-  const displayName = config.names[idx];
-  const chunks = [];
-
-  // profile header chunk
-  let headerHtml = `<div class="profile-header"><div><h2>${escapeHtml(displayName)}</h2>`;
-  const contacts = [];
-  if(data.email) contacts.push({label:'Email', value:data.email});
-  if(data.instagram) contacts.push({label:'Instagram', value:data.instagram});
-  if(data.youtube) contacts.push({label:'YouTube', value:data.youtube});
-  if(contacts.length>0){
-    headerHtml += `<div class="contact-info">`;
-    contacts.forEach(c=>{ headerHtml += `<div class="contact-item"><b>${c.label}</b><span>${escapeHtml(c.value)}</span></div>`; });
-    headerHtml += `</div>`;
-  }
-  headerHtml += `</div></div>`;
-  chunks.push(headerHtml);
-
-  function pushSection(title, groups){
-    const hasAny = groups.some(g=>g.items && g.items.length>0);
-    if(!hasAny) return;
-    chunks.push(`<div class="section-title-chunk"><h3>${title}</h3></div>`);
-    groups.forEach(g=>{
-      if(!g.items || g.items.length===0) return;
-      chunks.push(`<div class="platform-badge-chunk"><span class="badge">${escapeHtml(g.label)}</span></div>`);
-      // group cards into rows of 4 so each row is one chunk (keeps cards together but allows row-level breaks)
-      const rowSize = 4;
-      for(let i=0;i<g.items.length;i+=rowSize){
-        const rowItems = g.items.slice(i, i+rowSize);
-        let rowHtml = `<div class="card-grid pdf-row">`;
-        rowItems.forEach((item,ri)=>{ rowHtml += renderItemCard(item, true, i+ri); });
-        rowHtml += `</div>`;
-        chunks.push(rowHtml);
-      }
-    });
-  }
-
-  pushSection('이모티콘', [
-    {label:'네이버 OGQ마켓', items:data.emoticons.ogq},
-    {label:'LINE 스토어', items:data.emoticons.line}
-  ]);
-  pushSection('스톡이미지', [
-    {label:'미리캔버스 스톡이미지', items:data.stockImages.miri},
-    {label:'크라우드픽', items:data.stockImages.crowdpic}
-  ]);
-
-  if(data.animations && data.animations.length>0){
-    chunks.push(`<div class="section-title-chunk"><h3>애니메이션 (유튜브 쇼츠 / 인스타 릴스)</h3></div>`);
-    const rowSize = 4;
-    for(let i=0;i<data.animations.length;i+=rowSize){
-      const rowItems = data.animations.slice(i, i+rowSize);
-      let rowHtml = `<div class="card-grid pdf-row anim-grid">`;
-      rowItems.forEach((item)=>{
-        const ytId = getYouTubeId(item.link);
-        const aspect = getAnimAspect(item.link);
-        rowHtml += renderAnimThumb(item, ytId, aspect, true);
-      });
-      rowHtml += `</div>`;
-      chunks.push(rowHtml);
-    }
-  }
-
-  return chunks;
-}
-
-async function renderChunkToCanvas(area, chunkHtml){
-  area.innerHTML = `<div class="pdf-chunk">${chunkHtml}</div>`;
-  await waitForImages(area);
-  return await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff', width:area.clientWidth, windowWidth:area.clientWidth});
-}
-
 async function buildPdfForStudent(pdf, idx, data, area, isFirstOverall){
-  const pageWmm = 210, pageHmm = 297, marginMm = 10;
+  if(!isFirstOverall) pdf.addPage();
+  area.innerHTML = `<div class="pdf-doc">${renderPortfolioContent(idx, data, true)}</div>`;
+  await waitForImages(area);
+  const canvas = await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff'});
+
+  const pageWmm = 210, pageHmm = 297, marginMm = 8;
   const usableWmm = pageWmm - marginMm*2;
   const usableHmm = pageHmm - marginMm*2;
-  const mmPerPx = usableWmm / area.clientWidth;
 
-  const chunks = buildPdfChunks(idx, data);
-  let cursorYmm = marginMm;
-  let pageStarted = false;
+  const naturalWmm = usableWmm;
+  const naturalHmm = canvas.height * naturalWmm / canvas.width;
 
-  for(let c=0; c<chunks.length; c++){
-    const canvas = await renderChunkToCanvas(area, chunks[c]);
-    const chunkHmm = canvas.height * mmPerPx;
-    const chunkWmm = usableWmm;
-
-    if(!pageStarted){
-      if(!isFirstOverall || c>0 || true){
-        // start a new page for every student's first chunk except very first page of whole document
-      }
-    }
-
-    const needNewPage = !pageStarted || (cursorYmm + chunkHmm > pageHmm - marginMm);
-    if(needNewPage){
-      if(pageStarted || !isFirstOverall){
-        pdf.addPage();
-      }
-      cursorYmm = marginMm;
-      pageStarted = true;
-    }
-
-    if(chunkHmm > usableHmm){
-      // chunk itself taller than a full page (rare) - place at top of current/new page, allow overflow cut
-      const imgData = canvas.toDataURL('image/png');
-      pdf.addImage(imgData,'PNG',marginMm,cursorYmm,chunkWmm,chunkHmm);
-      cursorYmm = pageHmm; // force next chunk to new page
-    }else{
-      const imgData = canvas.toDataURL('image/png');
-      pdf.addImage(imgData,'PNG',marginMm,cursorYmm,chunkWmm,chunkHmm);
-      cursorYmm += chunkHmm + 4; // small gap between chunks
-    }
+  let drawWmm = naturalWmm, drawHmm = naturalHmm;
+  if(naturalHmm > usableHmm){
+    const scale = usableHmm / naturalHmm;
+    drawHmm = usableHmm;
+    drawWmm = naturalWmm * scale;
   }
+  const xMm = marginMm + (usableWmm - drawWmm)/2;
+  const yMm = marginMm;
+
+  const imgData = canvas.toDataURL('image/png');
+  pdf.addImage(imgData,'PNG',xMm,yMm,drawWmm,drawHmm);
   area.innerHTML = '';
 }
 
