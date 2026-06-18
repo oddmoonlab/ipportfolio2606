@@ -1099,28 +1099,29 @@ function waitForImages(container){
 
 async function buildPdfForStudent(pdf, idx, data, area, isFirstOverall){
   if(!isFirstOverall) pdf.addPage();
+  area.style.width = '1000px';
   area.innerHTML = `<div class="pdf-doc">${renderPortfolioContent(idx, data, true)}</div>`;
   await waitForImages(area);
-  const canvas = await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff'});
+  await new Promise(r=>setTimeout(r,50));
+  const canvas = await html2canvas(area, {useCORS:true, scale:1.5, backgroundColor:'#ffffff', width:1000, windowWidth:1000});
 
   const pageWmm = 210, pageHmm = 297, marginMm = 8;
   const usableWmm = pageWmm - marginMm*2;
   const usableHmm = pageHmm - marginMm*2;
 
-  const naturalWmm = usableWmm;
-  const naturalHmm = canvas.height * naturalWmm / canvas.width;
+  const naturalHmm = canvas.height * usableWmm / canvas.width;
 
-  let drawWmm = naturalWmm, drawHmm = naturalHmm;
+  let drawWmm = usableWmm, drawHmm = naturalHmm;
   if(naturalHmm > usableHmm){
     const scale = usableHmm / naturalHmm;
     drawHmm = usableHmm;
-    drawWmm = naturalWmm * scale;
+    drawWmm = usableWmm * scale;
   }
   const xMm = marginMm + (usableWmm - drawWmm)/2;
   const yMm = marginMm;
 
-  const imgData = canvas.toDataURL('image/png');
-  pdf.addImage(imgData,'PNG',xMm,yMm,drawWmm,drawHmm);
+  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+  pdf.addImage(imgData,'JPEG',xMm,yMm,drawWmm,drawHmm);
   area.innerHTML = '';
 }
 
