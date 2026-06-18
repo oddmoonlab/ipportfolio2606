@@ -679,7 +679,7 @@ function renderItemCard(item, forPDF, idx){
       <div class="item-img-wrap ${pastel}">${inner}</div>
       <div class="item-info">
         <div class="item-title">${escapeHtml(item.title || '제목 미입력')}</div>
-        ${forPDF ? `<div class="item-link-text">${escapeHtml(shortLinkLabel(item.link))}</div>` : `<a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`}
+        ${forPDF ? `<div class="item-link-text" data-pdf-link="${escapeHtml(item.link||'')}">${escapeHtml(shortLinkLabel(item.link))}</div>` : `<a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`}
       </div>
     </div>
   `;
@@ -741,7 +741,7 @@ function renderAnimThumb(item, ytId, aspect, forPDF){
   let infoHtml = label ? `<div class="anim-badge">${escapeHtml(label)}</div>` : '';
   infoHtml += `<div class="item-title">${escapeHtml(item.title||'제목 미입력')}</div>`;
   if(forPDF){
-    infoHtml += `<div class="item-link-text">${escapeHtml(shortLinkLabel(item.link))}</div>`;
+    infoHtml += `<div class="item-link-text" data-pdf-link="${escapeHtml(item.link||'')}">${escapeHtml(shortLinkLabel(item.link))}</div>`;
   }else{
     infoHtml += `<a href="${escapeHtml(item.link||'#')}" target="_blank" class="item-link">바로가기 <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`;
   }
@@ -1122,6 +1122,27 @@ async function buildPdfForStudent(pdf, idx, data, area, isFirstOverall){
 
   const imgData = canvas.toDataURL('image/jpeg', 0.92);
   pdf.addImage(imgData,'JPEG',xMm,yMm,drawWmm,drawHmm);
+
+  // overlay clickable link areas on top of each "바로가기" / item-link-text element,
+  // mapped from the captured DOM's pixel position to mm coordinates on the PDF page.
+  const docEl = area.querySelector('.pdf-doc');
+  const docRect = docEl.getBoundingClientRect();
+  const pxToMmX = drawWmm / docRect.width;
+  const pxToMmY = drawHmm / docRect.height;
+  const linkEls = area.querySelectorAll('[data-pdf-link]');
+  linkEls.forEach(el=>{
+    const url = el.getAttribute('data-pdf-link');
+    if(!url) return;
+    let target = url.trim();
+    if(!/^https?:\/\//i.test(target)) target = 'https://' + target;
+    const r = el.getBoundingClientRect();
+    const linkX = xMm + (r.left - docRect.left) * pxToMmX;
+    const linkY = yMm + (r.top - docRect.top) * pxToMmY;
+    const linkW = r.width * pxToMmX;
+    const linkH = r.height * pxToMmY;
+    pdf.link(linkX, linkY, linkW, linkH, { url: target });
+  });
+
   area.innerHTML = '';
 }
 
