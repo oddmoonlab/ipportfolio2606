@@ -258,9 +258,17 @@ i{ margin-right:6px; }
 #admin-progress{ margin-top:12px; font-weight:700; text-align:center; }
 
 /* ===== pdf render area ===== */
-#pdf-render-area{ position:absolute; left:-99999px; top:0; width:760px; background:#fff; }
+#pdf-render-area{ position:absolute; left:-99999px; top:0; width:1000px; background:#fff; }
 .pdf-doc{ padding:30px; font-family:inherit; }
-.pdf-chunk{ background:#fff; }
+.pdf-chunk{ background:#fff; padding:0 30px; }
+.pdf-chunk .card-grid.pdf-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:20px; justify-content:start; }
+.pdf-chunk .item-card{ width:100%; }
+.pdf-chunk .profile-header{ padding:0 0 24px; }
+.section-title-chunk h3{
+  font-size:1.5rem; font-weight:900; text-align:center; letter-spacing:2px; margin:0 auto 20px; text-transform:none;
+  padding-bottom:18px; border-bottom:2px solid var(--ink); width:80%;
+}
+.platform-badge-chunk{ text-align:center; margin-bottom:18px; }
 
 .site-footer{ text-align:center; color:#c4c4c4; font-size:.72rem; line-height:1.7; margin-top:50px; padding:0 20px; }
 .site-footer p{ margin:0; }
@@ -1158,7 +1166,7 @@ function buildPdfChunks(idx, data){
 async function renderChunkToCanvas(area, chunkHtml){
   area.innerHTML = `<div class="pdf-chunk">${chunkHtml}</div>`;
   await waitForImages(area);
-  return await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff'});
+  return await html2canvas(area, {useCORS:true, scale:2, backgroundColor:'#ffffff', width:area.clientWidth, windowWidth:area.clientWidth});
 }
 
 async function buildPdfForStudent(pdf, idx, data, area, isFirstOverall){
